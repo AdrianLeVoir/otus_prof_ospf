@@ -1,0 +1,96 @@
+---
+# ДЗ: OSPF — 3 роутера, OSPF на базе FRR, ассиметричный и симметричный роутинг
+# Переключение ассиметрия<->симметрия: переменная symmetric_routing (defaults/main.yml),
+# применяется без полного прогона: ansible-playbook -t setup_ospf -e "symmetric_routing=true"
+
+- name: OSPF lab
+  hosts: routers
+  become: true
+  vars_files:
+    - defaults/main.yml
+  tasks:
+    - name: disable ufw service
+      service:
+        name: ufw
+        state: stopped
+        enabled: false
+      ignore_errors: true
+
+    - name: install base tools
+      apt:
+        name:
+          - vim
+          - traceroute
+          - tcpdump
+          - net-tools
+        state: present
+        update_cache: true
+
+    - name: install FRR packages
+      apt:
+        name:
+          - frr
+          - frr-pythontools
+        state: present
+
+    - name: set up forward packages across routers
+      sysctl:
+        name: net.ipv4.conf.all.forwarding
+        value: '1'
+        state: present
+        sysctl_set: true
+        reload: true
+
+    # Асимметричная маршрутизация требует отключения rp_filter
+    - name: disable rp_filter (asymmetric routing)
+      sysctl:
+        name: net.ipv4.conf.all.rp_filter
+        value: '0'
+        state: present
+        sysctl_set: true
+        reload: true
+
+    - name: base set up OSPF (daemons)
+      template:
+        src: templates/daemons
+        dest: /etc/frr/daemons
+        owner: frr
+        group: frr
+        mode: "0640"
+
+    - name: set up OSPF (frr.conf)
+      template:
+        src: templates/frr.conf.j2
+        dest: /etc/frr/frr.conf
+        owner: frr
+        group: frr
+        mode: "0640"
+      tags:
+        - setup_ospf
+
+    - name: restart FRR
+      service:
+        name: frr
+        state: restarted
+        enabled: true
+      tags:
+        - setup_ospf
+
+    - name: wait for OSPF adjacency
+      wait_for:
+        timeout: 30
+      tags:
+        - setup_ospf
+
+    - name: verify OSPF neighbors
+      command: vtysh -c "show ip ospf neighbor"
+      register: neighbors
+      changed_when: false
+      tags:
+        - setup_ospf
+
+    - name: show neighbors
+      debug:
+        var: neighbors.stdout_lines
+      tags:
+        - setup_ospf

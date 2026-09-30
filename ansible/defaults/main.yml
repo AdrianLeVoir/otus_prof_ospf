@@ -1,0 +1,14 @@
+# Включать ли router-id (true/false)
+router_id_enable: true
+
+# Переключатель симметричного роутинга (задание 2.3):
+# false — ассиметричный роутинг (cost 1000 только на router1);
+# true  — cost 1000 ещё и на router2, роутинг становится симметричным.
+# Запуск только настройки OSPF: ansible-playbook -t setup_ospf -e "symmetric_routing=true" ...
+symmetric_routing: false
+
+# Стоимость "дорогого" линка r1-r2
+expensive_cost: 1000
+
+hello_interval: 10
+dead_interval: 30
